@@ -1,0 +1,126 @@
+###Pipeline to perform feature selection using GLM Elastic Net Modeling, with repetition to ensure reproducibility
+###Bradley Olinger, MHS
+###July 2024
+
+##EN_Repeat determines optimized lambda values across multiple iterations using the cv.glmnet package.
+##Due to random selection of train/test sets, the results of cv.glmnet vary with each run. 
+##This function repeats with a selected number of iterations,
+##and averages the optimized lambda values together across all runs in order to decrease variability and 
+##ensure reproducibility. 
+
+en_repeat <- function(clin_df, protein_list, control_list, trait_list, alpha, iterations, heatmap=FALSE){
+  #clin_df: df of all proteins, clinical traits, covariates
+  #protein_list: list of proteins and continuous covariates
+  #control_list: list of categorical covariates
+  #trait_list: list of dependent variables for which features are selected for association
+  #alpha: alpha parameter for elastic net that determines strength of penalty term
+  #iterations: number of time the elastic net modeling will repeat
+  
+  #default is no heatmap
+  p <- NA
+  
+  #Setup backend to use many processors
+  totalCores = detectCores()
+  #Leave one core to avoid overload your computer
+  cluster <- makeCluster(totalCores[1]-1)
+  registerDoParallel(cluster)
+  
+  #df to hold optimized alpha and lambda for each clinical trait
+  alpha_lambda <- as.data.frame(matrix(NA, ncol=2, nrow=length(trait_list)))
+  colnames(alpha_lambda) <- c("alpha","lambda")
+  rownames(alpha_lambda) <- trait_list
+  alpha_lambda$alpha = alpha
+  
+  #Build matrix to hold coefficients using optimized model with best alpha and lambda for each clinical trait
+  coef_glmnet <- as.data.frame(matrix(NA,nrow = length(trait_list), ncol = length(c(control_list,protein_list))))
+  rownames(coef_glmnet) <- trait_list
+  colnames(coef_glmnet) <- c(control_list,protein_list)
+  
+  #for each clinical trait: run N iterations of glmnet to find optimized lambda
+  for (val in 1:length(trait_list)){
+    #remove all rows missing the clinical trait
+    values_subset <- clin_df[complete.cases(clin_df[,trait_list[val]]),]
+    #isolate predictor variables and covariates only
+    proteins_subset <- as.data.frame(values_subset[,c(control_list,protein_list)])
+    #scale proteins and continuous controls
+    for(val2 in protein_list){
+      proteins_subset[,val2] <- scale(proteins_subset[,val2])
+    }
+    #subset to one clinical trait
+    clin_subset <- as.data.frame(scale(values_subset[,trait_list[val]]))
+    colnames(clin_subset) <- trait_list[val]
+    ###chosen number of trials to find lambda with lowest average mean standard error
+    x <- foreach(i = 1:iterations, .combine = cbind, .packages='glmnet') %dopar% {
+      cv <- cv.glmnet(as.matrix(proteins_subset),unlist(clin_subset), standardize=FALSE, alpha=alpha)
+      return(cv)
+    }
+    #from list of cv.glmnet objects, find lambda with minimum mean sq error across all trials
+    MSEs <- NULL
+    for(val5 in 1:iterations){
+      #collect mean squared error for each lambda
+      MSEs <- cbind(MSEs, x[,val5]$cvm)
+    }
+    rownames(MSEs) <- x[,1]$lambda
+    best_lambda <- as.numeric(names(which.min(rowMeans(MSEs))))
+    cvfit_subset <- cv.glmnet(as.matrix(proteins_subset),unlist(clin_subset), standardize=FALSE, alpha=alpha)
+    #using optimized lambda, find coefficients and fill df
+    coef_glmnet[trait_list[val],] <- as.numeric(coef(cvfit_subset, s = best_lambda)[c(1:length(c(control_list,protein_list))+1)])
+    #add optimized lambda to df
+    alpha_lambda[trait_list[val],"lambda"] <- best_lambda
+  }
+  coef_glmnet <- as.data.frame(coef_glmnet)
+  #Stop cluster
+  stopCluster(cluster)
+  
+  if(heatmap == TRUE){
+    #heatmap plot for all glmnet coefficients
+    p <- heatmaply(coef_glmnet,
+                   dendrogram = "column",
+                   k_col = 4,
+                   distfun = "spearman",
+                   xlab = "", ylab = "",
+                   main = "",
+                   #scale = "column",
+                   margins = c(60,100,40,20),
+                   grid_color = "white",
+                   grid_width = 0.00001,
+                   titleX = FALSE,
+                   hide_colorbar = FALSE,
+                   branches_lwd = 0.1,
+                   label_names = c("Clinical Trait", "Protein", "BTrait"),
+                   fontsize_row = 16, fontsize_col = 12,
+                   labCol = colnames(coef_glmnet),
+                   labRow = rownames(coef_glmnet),
+                   title = "Predictor Variable Beta by Clincal Trait",
+                   heatmap_layers = theme(axis.line=element_blank()),
+                   scale_fill_gradient_fun = ggplot2::scale_fill_gradientn(colours = c("#2E5894","#7392BA","#96AFCD","#B8CCE0","#DBE9F3","white", "#F6BDC0", "#F1959B", "#F07470","#EA4C46","#DC1C13"),
+                                                                           values = scales::rescale(c(min(coef_glmnet),-0.5,-0.4,-0.2,-0.001, 0, 0.001,0.25,0.5,0.75,max(coef_glmnet))))
+    )
+  }
+  
+  #count IV proteins per trait
+  #table to hold IV sums per clinical trait
+  IV_sums <- as.data.frame(matrix(NA,nrow=length(trait_list),ncol=1))
+  rownames(IV_sums) <- trait_list
+  colnames(IV_sums) <- c("IV_Count")
+  for(i in trait_list){
+    IV_sums[i,] <- length(coef_glmnet[i,coef_glmnet[i,]!=0])
+  }
+  #make bar graph with IV_sums
+  #add clin to column for x label
+  IV_sums$clin <- trait_list
+  plot_ivsum <- ggplot(data=IV_sums, aes(x = fct_inorder(clin), y = IV_Count)) +
+    theme_classic() +
+    geom_bar(stat = "identity", position = position_dodge(), color = "blue", fill = "grey")+
+    ggtitle("Sum Elastic Net Selected Proteins") +
+    ylab("Predictor Variable Sum") +
+    xlab("Clinical Trait") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), text = element_text(size = 16)) +
+    geom_hline(yintercept=length(c(protein_list,control_list)), color = "red", linetype = "dashed", linewidth= 0.75)
+  
+  #order optimized lambdas
+  alpha_lambda <- alpha_lambda[rev(order(alpha_lambda$lambda)),]
+  #return beta coefficients, optimized lambda values, heatmap of coef, bar graph of IV sums
+  list <- list("coef" = coef_glmnet, "lambda" = alpha_lambda, "heatmap" = p, "ivsum" = plot_ivsum)
+  return(list)
+}
