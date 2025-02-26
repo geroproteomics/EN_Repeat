@@ -9,7 +9,7 @@ features, for example gene expression levels, implicated in clinical parameters 
 
 One downside of elastic net modeling using common R functions such as cv.glmnet is the variability of the output, as train and test sets are selected randomly. This function reduces variability 
 and increases the robustness of results by repeating elastic net modeling in R using the glmnet package a user-specified number of times, averages the output, and produces a lambda value and set 
-of selected features that produce the lowest MSE across many trials.
+of selected features that produce the lowest MSE across many trials. This function also auto-scales features, uses parallel processing for faster output, and automates useful visualizations of the selected features.
 
 
 **Usage:**
@@ -27,3 +27,14 @@ EN_Repeat_Results <- EN_Repeat(clin_df, protein_list, control_list, trait_list, 
 | `heatmap`      | `boolean `  | Boolean value determining if a heatmap displaying effect size by feature and trait will be returned     |
 
 **Return Value:**
+Returns a list of the following elements:
+- Coef is a table showing the penalized effect size of each feature for each supplied trait.
+- Lambda is a table showing the supplied alpha and optimized lambda across many runs for each parameter of the trait_list.
+- Heatmap is a graphical representation of the penalized effect size of each feature for each supplied trait.
+- IVSum is a bar graph respresenting the number of selected features for each supplied parameter.
+
+![Example_ivsum](https://github.com/user-attachments/assets/af995d35-56ed-45d4-984d-b37fab84a095)
+
+
+
+
