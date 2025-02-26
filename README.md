@@ -31,9 +31,13 @@ Returns a list of the following elements:
 - Coef is a table showing the penalized effect size of each feature for each supplied trait.
 - Lambda is a table showing the supplied alpha and optimized lambda across many runs for each parameter of the trait_list.
 - Heatmap is a graphical representation of the penalized effect size of each feature for each supplied trait.
-- IVSum is a bar graph respresenting the number of selected features for each supplied parameter.
 
-![Example_ivsum](https://github.com/user-attachments/assets/af995d35-56ed-45d4-984d-b37fab84a095)
+- IVSum is a bar graph respresenting the number of selected features for each supplied parameter. Example image shows 100 possible features and 2 covariates.
+
+<p align="center">
+  <img src="images/Example_ivsum.JPG" alt="Example Image of Selected Features" width="500">
+</p>
+
 
 
 
