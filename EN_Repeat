@@ -1,12 +1,4 @@
-###Pipeline to perform feature selection using GLM Elastic Net Modeling, with repetition to ensure reproducibility
-###Bradley Olinger, MHS
-###July 2024
-
-##EN_Repeat determines optimized lambda values across multiple iterations using the cv.glmnet package.
-##Due to random selection of train/test sets, the results of cv.glmnet vary with each run. 
-##This function repeats with a selected number of iterations,
-##and averages the optimized lambda values together across all runs in order to decrease variability and 
-##ensure reproducibility. 
+#R Function to perform feature selection using Elastic Net Modeling, with repetition to ensure reproducibility and rubustness of modeling.
 
 en_repeat <- function(clin_df, protein_list, control_list, trait_list, alpha, iterations, heatmap=FALSE){
   #clin_df: df of all proteins, clinical traits, covariates
@@ -19,9 +11,9 @@ en_repeat <- function(clin_df, protein_list, control_list, trait_list, alpha, it
   #default is no heatmap
   p <- NA
   
-  #Setup backend to use many processors
+  #Parallel Processing for Faster Results
   totalCores = detectCores()
-  #Leave one core to avoid overload your computer
+  #Leave one core open
   cluster <- makeCluster(totalCores[1]-1)
   registerDoParallel(cluster)
   
