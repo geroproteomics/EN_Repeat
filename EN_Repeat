@@ -85,8 +85,7 @@ en_repeat <- function(clin_df, protein_list, control_list, trait_list, alpha, it
                    labRow = rownames(coef_glmnet),
                    title = "Predictor Variable Beta by Clincal Trait",
                    heatmap_layers = theme(axis.line=element_blank()),
-                   scale_fill_gradient_fun = ggplot2::scale_fill_gradientn(colours = c("#2E5894","#7392BA","#96AFCD","#B8CCE0","#DBE9F3","white", "#F6BDC0", "#F1959B", "#F07470","#EA4C46","#DC1C13"),
-                                                                           values = scales::rescale(c(min(coef_glmnet),-0.5,-0.4,-0.2,-0.001, 0, 0.001,0.25,0.5,0.75,max(coef_glmnet))))
+                   scale_fill_gradient_fun = ggplot2::scale_fill_gradient2(low = "blue", high = "red", midpoint = 0)
     )
   }
   
