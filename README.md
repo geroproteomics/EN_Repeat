@@ -1,3 +1,6 @@
+# EN_Repeat
+Function that validates features chosen via elastic net modeling by identifying out-of-sample prediction ability.
+
 **R Function Name:**  
 EN_Repeat
 
